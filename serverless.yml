@@ -1,0 +1,27 @@
+service: farsi-dic
+
+
+provider:
+  name: aws
+  runtime: python3.6
+  iamManagedPolicies:
+    - arn:aws:iam::aws:policy/AdministratorAccess
+
+# you can overwrite defaults here
+#  stage: dev
+  region: us-west-2
+
+
+functions:
+  hello:
+    handler: handler.hello
+    events:
+      - alexaSkill: amzn1.ask.skill.0db7e5b5-b5d1-417d-88f1-efa10e1771c1
+
+#    Define function environment variables here
+#    environment:
+#      variable2: value2
+
+
+plugins:
+  - serverless-python-requirements
