@@ -1,9 +1,13 @@
 import json
 import logging
+import s3util
+import util
+
 from ask_sdk_core.skill_builder import SkillBuilder
 from ask_sdk_core.dispatch_components import AbstractRequestHandler
 from ask_sdk_core.utils import is_request_type, is_intent_name
 from ask_sdk_core.handler_input import HandlerInput
+from ask_sdk_core.dispatch_components import AbstractExceptionHandler
 from ask_sdk_model import Response
 from ask_sdk_model.ui import SimpleCard
 sb = SkillBuilder()
@@ -21,6 +25,9 @@ def hello(event, context):
 
     sb.add_request_handler(LaunchRequestHandler())
     sb.add_request_handler(QuestionIntentHandler())
+    sb.add_request_handler(CancelOrStopIntentHandler())
+
+    sb.add_exception_handler(AllExceptionHandler())
 
     handler = sb.lambda_handler()
 
@@ -34,7 +41,7 @@ class LaunchRequestHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
-        speech_text = "Welcome to the Lexis Noah AI company, ask me any question, and I will happy to answer"
+        speech_text = "Welcome to Farsi dictionary, ask any word I will happy to answer"
 
         handler_input.response_builder.speak(speech_text).set_card(
             SimpleCard("launch", speech_text)).set_should_end_session(
@@ -42,6 +49,44 @@ class LaunchRequestHandler(AbstractRequestHandler):
         return handler_input.response_builder.response
 
 
+class CancelOrStopIntentHandler(AbstractRequestHandler):
+    """Single handler for Cancel and Stop Intent."""
+
+    def can_handle(self, handler_input):
+        # type: (HandlerInput) -> bool
+        return (is_intent_name("AMAZON.CancelIntent")(handler_input) or
+                is_intent_name("AMAZON.StopIntent")(handler_input))
+
+    def handle(self, handler_input):
+        # type: (HandlerInput) -> Response
+
+        logger.info('CancelOrStopIntentHandler')
+
+        handler_input.response_builder.speak("Bye").set_card(
+            SimpleCard("Hello World", "Bye"))
+        return handler_input.response_builder.response
+
+
+class AllExceptionHandler(AbstractExceptionHandler):
+
+    def can_handle(self, handler_input, exception):
+        # type: (HandlerInput, Exception) -> bool
+        return True
+
+    def handle(self, handler_input, exception):
+        # type: (HandlerInput, Exception) -> Response
+        # Log the exception in CloudWatch Logs
+        print(exception)
+
+        logger.info('AllExceptionHandler')
+        logger.info('locale')
+        locale = handler_input.request_envelope.request.locale
+        logger.info(locale)
+
+        speech_text = "Internal Error"
+
+        handler_input.response_builder.speak(speech_text).ask(speech_text)
+        return handler_input.response_builder.response
 
 
 class QuestionIntentHandler(AbstractRequestHandler):
@@ -52,7 +97,6 @@ class QuestionIntentHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
         # Tell us about Lexis Noah's philosophy
-        speech_text = "I don't know the answer"
 
         logger.info('request')
         logger.info(handler_input.request_envelope)
@@ -63,18 +107,23 @@ class QuestionIntentHandler(AbstractRequestHandler):
         logger.info('slots')
         logger.info(slots)
 
-        key = slots['key']
-        logger.info(key)
+        word_slot = slots['word']
+        logger.info('slot')
+        logger.info(word_slot)
 
-        if key.id == 'philosophy':
-            speech_text = "Lexis Noah's philosophy is to unlock the infinite possibilities of one billion people."
+        logger.info('value')
+        word = word_slot.value
+        logger.info(word)
 
-        if key.id == 'company':
-            speech_text = "Lexis Noah Co., Ltd. is headquartered in Nihonbashi Ningyocho, Chuo-ku, Tokyo, and has three core businesses: seminar business, edtech business, and education business."
+        words = ["able", "ability", "absence", "absolute", "abroad", "abortion"]
+        if word in words:
+            logger.info('signed_url')
+            signed_url = s3util.create_presigned_url("farsi-dic", "%s.%s" % (word, "mp3"))
+            logger.info(signed_url)
+            return util.play(url=signed_url, offset=0, text=word,
+                             card_data=None, response_builder=handler_input.response_builder)
 
-        if key.id == 'representative':
-            speech_text = "Lexis Noah's representative director is Seiji Kano."
-
+        speech_text = "I don't know the word %s" % word
         handler_input.response_builder.speak(speech_text).set_card(
             SimpleCard("aaa", speech_text)).set_should_end_session(
             True)
